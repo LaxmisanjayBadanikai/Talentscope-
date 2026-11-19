@@ -370,4 +370,370 @@ header p { color:var(--dim); font-size:11.5px; margin-top:3px; }
 .career-card { background:rgba(255,255,255,0.03); border:1px solid var(--border); border-radius:10px; padding:11px 13px; }
 .career-card .role { font-size:12.5px; font-weight:700; color:#c7d2fe; text-transform:capitalize; }
 .career-card .salary { font-size:16px; font-weight:800; color:#6ee7b7; font-family:'JetBrains Mono',monospace; margin-top:4px; }
-.career-card .meta { display:flex; gap:10px; margin-top:5px; font-size:10px; color:va
+.career-card .meta { display:flex; gap:10px; margin-top:5px; font-size:10px; color:var(--dim); }
+.career-card .uplift-badge { display:inline-block; padding:2px 8px; border-radius:10px; background:rgba(16,185,129,0.15); color:#6ee7b7; border:1px solid rgba(16,185,129,0.3); font-weight:700; font-size:10px; margin-left:5px; }
+.charts-row { display:grid; grid-template-columns: repeat(3,1fr); gap:12px; margin-top:12px; }
+@media (max-width:1000px){ .charts-row{grid-template-columns:1fr;} }
+canvas { max-height:200px; }
+#shap-chart { max-height:170px; }
+footer { text-align:center; margin-top:14px; color:var(--dim); font-size:10px; }
+.spinner { display:inline-block; width:12px; height:12px; border:2px solid rgba(255,255,255,0.3); border-top-color:white; border-radius:50%; animation:spin 0.6s linear infinite; vertical-align:middle; margin-right:6px; }
+@keyframes spin { to { transform:rotate(360deg); } }
+.empty-state { text-align:center; padding:26px 16px; color:var(--dim); font-size:11px; border:2px dashed rgba(255,255,255,0.06); border-radius:10px; }
+</style>
+</head>
+<body>
+<div class='container'>
+  <header>
+    <div>
+      <h1>TalentScope AI</h1>
+      <p>Job Market Intelligence · Salary Prediction · Skill Gap Analysis · Career Paths</p>
+    </div>
+    <span class='badge-live'>LIVE MARKET</span>
+  </header>
+
+  <div class='stats-row'>
+    <div class='stat-card indigo'><div class='label'>Postings in Buffer</div><div class='value' id='s-total'>0</div><div class='sub'>live market feed</div></div>
+    <div class='stat-card green'><div class='label'>Avg Salary</div><div class='value' id='s-avg'>$0</div><div class='sub'>across live postings</div></div>
+    <div class='stat-card cyan'><div class='label'>Median Salary</div><div class='value' id='s-med'>$0</div><div class='sub'>50th percentile</div></div>
+    <div class='stat-card amber'><div class='label'>Remote %</div><div class='value' id='s-remote'>0%</div><div class='sub'>fully-remote postings</div></div>
+    <div class='stat-card violet'><div class='label'>Hottest Role</div><div class='value' id='s-role' style='font-size:14px;'>—</div><div class='sub'>most frequent in feed</div></div>
+  </div>
+
+  <div class='main-grid'>
+    <div class='panel'>
+      <h2>Salary Predictor</h2>
+      <p class='subtitle'>Predict fair market salary + see what drives it (SHAP)</p>
+      <div class='form-grid three'>
+        <div class='field'><label>Role</label><select id='p-role'></select></div>
+        <div class='field'><label>Seniority</label><select id='p-seniority'></select></div>
+        <div class='field'><label>City</label><select id='p-city'></select></div>
+      </div>
+      <div class='form-grid three'>
+        <div class='field'><label>Company Tier</label><select id='p-company'></select></div>
+        <div class='field'><label>Industry</label><select id='p-industry'></select></div>
+        <div class='field'><label>Remote</label><select id='p-remote'></select></div>
+      </div>
+      <div class='form-grid'>
+        <div class='field'><label>Years of Experience</label><input type='number' id='p-years' value='4' min='0' max='30'></div>
+        <div class='field'><label>&nbsp;</label><button class='btn full' id='predict-btn' onclick='predictSalary()' style='margin-top:0;'>Predict Salary</button></div>
+      </div>
+      <div style='margin-top:8px;'>
+        <label style='font-size:9.5px; font-weight:600; color:var(--dim); text-transform:uppercase; letter-spacing:0.6px;'>Skills</label>
+        <div class='skills-grid' id='skills-grid'></div>
+      </div>
+      <div class='result-hero' id='predict-result'>
+        <div class='label'>Predicted Market Salary</div>
+        <div class='price' id='pred-salary'>$—</div>
+        <div class='range' id='pred-range'>—</div>
+      </div>
+      <div id='shap-container' style='margin-top:10px; display:none;'>
+        <h3 style='font-size:10.5px; color:var(--dim); text-transform:uppercase; letter-spacing:1px; margin-bottom:6px;'>SHAP — What Drives This Prediction</h3>
+        <canvas id='shap-chart' height='200'></canvas>
+      </div>
+    </div>
+
+    <div class='panel'>
+      <h2>Live Job Feed</h2>
+      <p class='subtitle'>New postings every ~3s · click a row to load into predictor</p>
+      <div class='feed' id='feed'></div>
+    </div>
+  </div>
+
+  <div class='main-grid'>
+    <div class='panel'>
+      <h2>Skill Gap Analyzer</h2>
+      <p class='subtitle'>What skills should you learn next to reach your target role?</p>
+      <div class='form-grid'>
+        <div class='field'><label>Target Role</label><select id='gap-role'></select></div>
+        <div class='field'><label>&nbsp;</label><button class='btn full' onclick='analyzeGap()' style='margin-top:0;' id='gap-btn'>Analyze Gap</button></div>
+      </div>
+      <div style='margin-top:8px;'>
+        <label style='font-size:9.5px; font-weight:600; color:var(--dim); text-transform:uppercase; letter-spacing:0.6px;'>Your Current Skills</label>
+        <div class='skills-grid' id='gap-skills-grid'></div>
+      </div>
+      <div id='gap-result' style='margin-top:10px;'><div class='empty-state'>Pick a target role + your current skills, then analyze</div></div>
+    </div>
+
+    <div class='panel'>
+      <h2>Career Path Explorer</h2>
+      <p class='subtitle'>Where can you go next, and how much more could you earn?</p>
+      <div class='form-grid'>
+        <div class='field'><label>Current Role</label><select id='cp-role'></select></div>
+        <div class='field'><label>Years of Experience</label><input type='number' id='cp-years' value='4' min='0' max='30'></div>
+      </div>
+      <button class='btn full' onclick='exploreCareer()' id='cp-btn'>Explore Next Steps</button>
+      <div id='cp-result' style='margin-top:10px;'><div class='empty-state'>Enter your current role + experience to see next steps</div></div>
+    </div>
+  </div>
+
+  <div class='charts-row'>
+    <div class='panel'><h2>Salary by Role</h2><p class='subtitle'>Average market salary per role</p><canvas id='role-chart'></canvas></div>
+    <div class='panel'><h2>Top Paying Skills</h2><p class='subtitle'>Salary uplift vs market ($)</p><canvas id='skill-chart'></canvas></div>
+    <div class='panel'><h2>Feature Importance</h2><p class='subtitle'>Top 12 model drivers</p><canvas id='imp-chart'></canvas></div>
+  </div>
+
+  <footer>TalentScope AI · Gradient Boosting salary model · SHAP explanations · served via Render</footer>
+</div>
+
+<script>
+var insights = null;
+var selectedSkills = new Set();
+var selectedGapSkills = new Set();
+var shapChart = null, roleChart = null, skillChart = null, impChart = null;
+
+function fmt(n){ return '$' + Number(n).toLocaleString(); }
+function cap(s){ return s.replace(/_/g,' ').replace(/\\b\\w/g, function(c){ return c.toUpperCase(); }); }
+
+async function loadInsights() {
+  const r = await fetch('/api/insights');
+  insights = await r.json();
+  populateDropdowns();
+  buildSkillsGrid();
+  renderCharts();
+}
+
+function populateDropdowns() {
+  const roleOpts = insights.roles.map(function(r,i){ return `<option value='${i}'>${cap(r)}</option>`; }).join('');
+  const senOpts  = insights.seniorities.map(function(r,i){ return `<option value='${i}'>${cap(r)}</option>`; }).join('');
+  const cityOpts = insights.cities.map(function(r,i){ return `<option value='${i}'>${cap(r)}</option>`; }).join('');
+  const compOpts = insights.company_tiers.map(function(r,i){ return `<option value='${i}'>${cap(r)}</option>`; }).join('');
+  const indOpts  = insights.industries.map(function(r,i){ return `<option value='${i}'>${cap(r)}</option>`; }).join('');
+  const remOpts  = insights.remote_types.map(function(r,i){ return `<option value='${i}'>${cap(r)}</option>`; }).join('');
+
+  ['p-role','gap-role','cp-role'].forEach(function(id){ document.getElementById(id).innerHTML = roleOpts; });
+  document.getElementById('p-seniority').innerHTML = senOpts;
+  document.getElementById('p-city').innerHTML = cityOpts;
+  document.getElementById('p-company').innerHTML = compOpts;
+  document.getElementById('p-industry').innerHTML = indOpts;
+  document.getElementById('p-remote').innerHTML = remOpts;
+
+  document.getElementById('p-role').value = 2;
+  document.getElementById('p-seniority').value = 2;
+  document.getElementById('p-city').value = 0;
+  document.getElementById('p-company').value = 2;
+  document.getElementById('p-industry').value = 4;
+  document.getElementById('p-remote').value = 1;
+  document.getElementById('gap-role').value = 2;
+  document.getElementById('cp-role').value = 0;
+}
+
+function buildSkillsGrid() {
+  const html = insights.skills.map(function(s){
+    return `<label class='skill-chip' data-skill='${s}'><input type='checkbox' value='${s}' onchange="toggleSkill(this,'selectedSkills')"><span>${s}</span></label>`;
+  }).join('');
+  document.getElementById('skills-grid').innerHTML = html;
+
+  const gapHtml = insights.skills.map(function(s){
+    return `<label class='skill-chip' data-skill='${s}'><input type='checkbox' value='${s}' onchange="toggleSkill(this,'selectedGapSkills')"><span>${s}</span></label>`;
+  }).join('');
+  document.getElementById('gap-skills-grid').innerHTML = gapHtml;
+}
+
+function toggleSkill(el, setName) {
+  const chip = el.closest('.skill-chip');
+  const set = setName === 'selectedSkills' ? selectedSkills : selectedGapSkills;
+  if (el.checked) { set.add(el.value); chip.classList.add('checked'); }
+  else { set.delete(el.value); chip.classList.remove('checked'); }
+}
+
+async function predictSalary() {
+  const btn = document.getElementById('predict-btn');
+  btn.disabled = true; btn.innerHTML = `<span class='spinner'></span>Predicting...`;
+
+  const payload = {
+    role_id: +document.getElementById('p-role').value,
+    seniority_id: +document.getElementById('p-seniority').value,
+    city_id: +document.getElementById('p-city').value,
+    company_tier_id: +document.getElementById('p-company').value,
+    industry_id: +document.getElementById('p-industry').value,
+    remote_type_id: +document.getElementById('p-remote').value,
+    years_experience: +document.getElementById('p-years').value,
+    skills: Array.from(selectedSkills),
+  };
+
+  try {
+    const r = await fetch('/api/predict_salary', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+    const d = await r.json();
+    if (d.error) { alert('Error: ' + d.error); return; }
+    document.getElementById('pred-salary').textContent = fmt(d.predicted_salary);
+    document.getElementById('pred-range').textContent = fmt(d.range_low) + '  —  ' + fmt(d.range_high) + '  (95% CI)';
+    document.getElementById('predict-result').classList.add('show');
+    document.getElementById('shap-container').style.display = 'block';
+    renderShap(d.shap);
+  } catch(e) { alert('Error: ' + e.message); }
+  finally { btn.disabled = false; btn.innerHTML = 'Predict Salary'; }
+}
+
+function renderShap(shapData) {
+  const labels = shapData.map(function(s){ return s.feature; });
+  const values = shapData.map(function(s){ return s.impact; });
+  const colors = values.map(function(v){ return v > 0 ? 'rgba(16,185,129,0.75)' : 'rgba(239,68,68,0.75)'; });
+
+  if (shapChart) shapChart.destroy();
+  const ctx = document.getElementById('shap-chart').getContext('2d');
+  shapChart = new Chart(ctx, {
+    type: 'bar',
+    data: { labels: labels, datasets: [{ data: values, backgroundColor: colors, borderRadius: 4 }] },
+    options: {
+      indexAxis: 'y', responsive: true,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(c){ return (c.raw >= 0 ? '+' : '') + '$' + Math.round(c.raw).toLocaleString(); } } } },
+      scales: {
+        x: { ticks: { color:'#94a3b8', callback: function(v){ return (v>=0?'+':'') + '$' + Math.round(v/1000) + 'k'; }, font:{size:9} }, grid:{color:'rgba(255,255,255,0.05)'} },
+        y: { ticks: { color:'#cbd5e1', font:{size:10} }, grid:{display:false} }
+      }
+    }
+  });
+}
+
+async function refreshFeed() {
+  try {
+    const r = await fetch('/api/feed');
+    const d = await r.json();
+    const el = document.getElementById('feed');
+    el.innerHTML = d.postings.map(function(p){
+      return `<div class='feed-row' onclick="loadFromFeed(${JSON.stringify(p).replace(/"/g,'&quot;')})">
+        <span class='tid'>${p.posting_id}</span>
+        <span class='role'>${cap(p.role_name)} · ${p.seniority_name}</span>
+        <span class='city'>${cap(p.city_name).slice(0,7)}</span>
+        <span class='sal'>${fmt(p.predicted_salary)}</span>
+      </div>`;
+    }).join('');
+  } catch(e) { console.error(e); }
+}
+
+async function refreshStats() {
+  try {
+    const r = await fetch('/api/stats');
+    const d = await r.json();
+    document.getElementById('s-total').textContent = d.total;
+    document.getElementById('s-avg').textContent = fmt(d.avg_salary);
+    document.getElementById('s-med').textContent = fmt(d.median_salary);
+    document.getElementById('s-remote').textContent = d.remote_pct + '%';
+    document.getElementById('s-role').textContent = cap(d.top_role);
+  } catch(e) { console.error(e); }
+}
+
+function loadFromFeed(p) {
+  document.getElementById('p-role').value = insights.roles.indexOf(p.role_name);
+  document.getElementById('p-seniority').value = insights.seniorities.indexOf(p.seniority_name);
+  document.getElementById('p-city').value = insights.cities.indexOf(p.city_name);
+  document.getElementById('p-company').value = insights.company_tiers.indexOf(p.company_tier_name);
+  document.getElementById('p-remote').value = insights.remote_types.indexOf(p.remote_type_name);
+  document.getElementById('p-years').value = p.years_experience;
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+async function analyzeGap() {
+  const btn = document.getElementById('gap-btn');
+  btn.disabled = true; btn.innerHTML = `<span class='spinner'></span>Analyzing...`;
+  try {
+    const payload = { target_role: insights.roles[+document.getElementById('gap-role').value], skills: Array.from(selectedGapSkills) };
+    const r = await fetch('/api/skill_gap', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+    const d = await r.json();
+    renderGap(d);
+  } catch(e) { alert('Error: ' + e.message); }
+  finally { btn.disabled = false; btn.innerHTML = 'Analyze Gap'; }
+}
+
+function renderGap(d) {
+  const el = document.getElementById('gap-result');
+  if (!d.missing_skills || d.missing_skills.length === 0) {
+    el.innerHTML = `<div class='empty-state'>No significant gaps found — you may already be a strong fit for <strong>${cap(d.target_role)}</strong>!</div>`;
+    return;
+  }
+  let html = `<table class='gap-table'><thead><tr><th>Skill</th><th>Required in</th><th>Avg Salary Uplift</th></tr></thead><tbody>`;
+  d.missing_skills.forEach(function(s){
+    html += `<tr><td class='skill-name'>${s.skill}</td><td>${s.pct_required}%</td><td class='uplift'>+$${s.salary_uplift.toLocaleString()}</td></tr>`;
+  });
+  html += '</tbody></table>';
+  el.innerHTML = html;
+}
+
+async function exploreCareer() {
+  const btn = document.getElementById('cp-btn');
+  btn.disabled = true; btn.innerHTML = `<span class='spinner'></span>Exploring...`;
+  try {
+    const roleName = insights.roles[+document.getElementById('cp-role').value];
+    const years = +document.getElementById('cp-years').value;
+    const r = await fetch('/api/career_path?current_role=' + roleName + '&years_exp=' + years);
+    const d = await r.json();
+    renderCareer(d);
+  } catch(e) { alert('Error: ' + e.message); }
+  finally { btn.disabled = false; btn.innerHTML = 'Explore Next Steps'; }
+}
+
+function renderCareer(d) {
+  const el = document.getElementById('cp-result');
+  if (!d.recommendations || d.recommendations.length === 0) {
+    el.innerHTML = `<div class='empty-state'>No clear next-step roles found for ${cap(d.current_role)} at ${d.years_exp} yrs experience.</div>`;
+    return;
+  }
+  let html = `<div class='career-grid'>`;
+  d.recommendations.forEach(function(c){
+    html += `<div class='career-card'>
+      <div class='role'>${cap(c.role)}<span class='uplift-badge'>+${c.salary_uplift_pct}%</span></div>
+      <div class='salary'>${fmt(c.avg_salary)}</div>
+      <div class='meta'><span>Avg exp: ${c.avg_exp} yrs</span><span>${c.postings_in_market} postings</span></div>
+    </div>`;
+  });
+  html += '</div>';
+  el.innerHTML = html;
+}
+
+function renderCharts() {
+  const rLabels = insights.role_stats.map(function(r){ return cap(r.role); });
+  const rValues = insights.role_stats.map(function(r){ return r.avg_salary; });
+  if (roleChart) roleChart.destroy();
+  roleChart = new Chart(document.getElementById('role-chart'), {
+    type: 'bar',
+    data: { labels: rLabels, datasets: [{ data: rValues, backgroundColor: 'rgba(99,102,241,0.7)', borderRadius: 4 }] },
+    options: { indexAxis:'y', responsive:true, plugins:{legend:{display:false}, tooltip:{callbacks:{label:function(c){ return '$'+c.raw.toLocaleString(); }}}},
+      scales: { x:{ ticks:{color:'#94a3b8', callback:function(v){return '$'+Math.round(v/1000)+'k';}, font:{size:9}}, grid:{color:'rgba(255,255,255,0.05)'} }, y:{ ticks:{color:'#cbd5e1', font:{size:10}}, grid:{display:false} } }
+    }
+  });
+
+  const sLabels = insights.skill_stats.slice(0,12).map(function(s){ return s.skill; });
+  const sValues = insights.skill_stats.slice(0,12).map(function(s){ return s.salary_uplift; });
+  if (skillChart) skillChart.destroy();
+  skillChart = new Chart(document.getElementById('skill-chart'), {
+    type: 'bar',
+    data: { labels: sLabels, datasets: [{ data: sValues, backgroundColor: 'rgba(16,185,129,0.7)', borderRadius: 4 }] },
+    options: { indexAxis:'y', responsive:true, plugins:{legend:{display:false}, tooltip:{callbacks:{label:function(c){ return '+$'+Math.round(c.raw).toLocaleString(); }}}},
+      scales: { x:{ ticks:{color:'#94a3b8', callback:function(v){return '$'+Math.round(v/1000)+'k';}, font:{size:9}}, grid:{color:'rgba(255,255,255,0.05)'} }, y:{ ticks:{color:'#cbd5e1', font:{size:10}}, grid:{display:false} } }
+    }
+  });
+
+  const iLabels = insights.importances.slice(0,12).map(function(i){ return i.feature; });
+  const iValues = insights.importances.slice(0,12).map(function(i){ return i.importance; });
+  if (impChart) impChart.destroy();
+  impChart = new Chart(document.getElementById('imp-chart'), {
+    type: 'bar',
+    data: { labels: iLabels, datasets: [{ data: iValues, backgroundColor: 'rgba(139,92,246,0.7)', borderRadius: 4 }] },
+    options: { indexAxis:'y', responsive:true, plugins:{legend:{display:false}},
+      scales: { x:{ ticks:{color:'#94a3b8', font:{size:9}}, grid:{color:'rgba(255,255,255,0.05)'} }, y:{ ticks:{color:'#cbd5e1', font:{size:10}}, grid:{display:false} } }
+    }
+  });
+}
+
+(async function(){
+  await loadInsights();
+  await refreshFeed();
+  await refreshStats();
+  setInterval(refreshFeed, 3000);
+  setInterval(refreshStats, 3000);
+})();
+</script>
+</body>
+</html>'''
+
+@app.route('/')
+def home():
+    return HTML_PAGE
+
+# ==========================================
+# 6. RUN
+# ==========================================
+if __name__ == '__main__':
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host='0.0.0.0', port=port)
